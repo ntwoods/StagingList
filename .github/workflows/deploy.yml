@@ -19,10 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/configure-pages@v5
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - name: Detect app directory
         run: |
           if [ -f frontend/package.json ]; then
@@ -33,6 +36,7 @@ jobs:
             echo "No package.json found. Ensure the frontend folder is committed."
             exit 1
           fi
+
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then
@@ -41,12 +45,32 @@ jobs:
             npm install
           fi
         working-directory: ${{ env.APP_DIR }}
-      - name: Build
-        run: npm run build
+
+      # ✅ FIX: ensure VITE_API_BASE exists + inject it as .env.production for Vite build
+      - name: Create .env.production (Vite env injection)
+        run: |
+          if [ -z "${{ secrets.VITE_API_BASE }}" ] && [ -z "${{ vars.VITE_API_BASE }}" ]; then
+            echo "ERROR: Missing VITE_API_BASE. Add it in GitHub Secrets or Variables."
+            exit 1
+          fi
+
+          # Prefer secrets, fallback to vars
+          API_BASE="${{ secrets.VITE_API_BASE }}"
+          if [ -z "$API_BASE" ]; then
+            API_BASE="${{ vars.VITE_API_BASE }}"
+          fi
+
+          echo "VITE_API_BASE=$API_BASE" > .env.production
+          echo "VITE_BASE=/${{ github.event.repository.name }}/" >> .env.production
+          echo "Created .env.production:"
+          cat .env.production
         working-directory: ${{ env.APP_DIR }}
-        env:
-          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
-          VITE_BASE: /StagingList/
+
+      # ✅ FIX: correct base path for project pages
+      - name: Build
+        run: npm run build -- --base="/${{ github.event.repository.name }}/"
+        working-directory: ${{ env.APP_DIR }}
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ env.APP_DIR }}/dist
