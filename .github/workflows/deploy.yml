@@ -17,15 +17,22 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Detect app directory
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "APP_DIR=frontend" >> "$GITHUB_ENV"
+          elif [ -f package.json ]; then
+            echo "APP_DIR=." >> "$GITHUB_ENV"
+          else
+            echo "No package.json found. Ensure the frontend folder is committed."
+            exit 1
+          fi
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then
@@ -33,14 +40,16 @@ jobs:
           else
             npm install
           fi
+        working-directory: ${{ env.APP_DIR }}
       - name: Build
         run: npm run build
+        working-directory: ${{ env.APP_DIR }}
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_BASE: /StagingList/
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/dist
+          path: ${{ env.APP_DIR }}/dist
 
   deploy:
     needs: build
