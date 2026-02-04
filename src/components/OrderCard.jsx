@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatRemaining, getRemaining } from "./CountdownTimer.jsx";
 
 function normalizeColor(value) {
@@ -19,10 +19,20 @@ function formatUrlLabel(url) {
   }
 }
 
+function segmentLabel(segment) {
+  if (segment?.segmentLabel) return segment.segmentLabel;
+  if (segment?.segmentIndex === 0) return "Final";
+  if (typeof segment?.segmentIndex === "number") return `Additional-${segment.segmentIndex}`;
+  return "Segment";
+}
+
 export default function OrderCard({ order, now, onAttachFinal, onAttachAdditional }) {
   const [showAllAdditional, setShowAllAdditional] = useState(false);
   const { remainingMs, isOverdue } = getRemaining(order.primaryTimestamp, now);
   const colorClass = normalizeColor(order.color);
+
+  const returnedSegments = order.returnedSegments || [];
+  const isReturned = returnedSegments.length > 0;
 
   const additionalUrls = order.additional?.urlsPending || [];
   const visibleAdditional = showAllAdditional ? additionalUrls : additionalUrls.slice(0, 1);
@@ -34,8 +44,10 @@ export default function OrderCard({ order, now, onAttachFinal, onAttachAdditiona
       : `Show +${additionalUrls.length - 1} more`;
   }, [additionalUrls.length, showAllAdditional]);
 
+  const cardClass = `order-card ${isReturned ? "returned" : ""} ${isOverdue ? "overdue" : ""}`;
+
   return (
-    <article className={`order-card ${isOverdue ? "overdue" : ""}`}>
+    <article className={cardClass}>
       <header className="order-card-header">
         <div>
           <h3>{order.dealerName || "Dealer"}</h3>
@@ -43,6 +55,29 @@ export default function OrderCard({ order, now, onAttachFinal, onAttachAdditiona
         </div>
         <div className={`color-chip ${colorClass}`}>{order.color || "Unknown"}</div>
       </header>
+
+      {isReturned ? (
+        <section className="returned-section">
+          <div className="returned-title">Returned by EA</div>
+          <div className="returned-items">
+            {returnedSegments.map((segment) => (
+              <div
+                className="returned-item"
+                key={`${order.orderId}-${segment.segmentIndex}-${segment.segmentUrl || ""}`}
+              >
+                <div className="returned-header">
+                  <span className="returned-chip">{segmentLabel(segment)}</span>
+                </div>
+
+                <div className="returned-remark">
+                  <span className="label">EA Remark</span>
+                  <span className="value">{segment.remark || "-"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="order-meta">
         <div>
@@ -96,10 +131,7 @@ export default function OrderCard({ order, now, onAttachFinal, onAttachAdditiona
                   <a className="btn ghost" href={url} target="_blank" rel="noreferrer">
                     View Additional Order
                   </a>
-                  <button
-                    className="btn primary"
-                    onClick={() => onAttachAdditional(order, url)}
-                  >
+                  <button className="btn primary" onClick={() => onAttachAdditional(order, url)}>
                     Attach SO (Additional)
                   </button>
                 </div>
